@@ -14,8 +14,8 @@ library(corrplot)
 tidymodels_prefer()
 
 # load data ----
-train_classification <- read_csv("data/train_classification.csv")
-test_classification <- read_csv("data/test_classification.csv")
+train_classification <- read_csv(here("data/train_classification.csv"), col_type = cols(id = col_character()))
+test_classification <- read_csv(here("data/test_classification.csv"), col_type = cols(id = col_character()))
 
 # check missingness
 missingness <- train_classification |>  miss_var_summary() 
