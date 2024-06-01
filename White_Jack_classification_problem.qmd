@@ -1,0 +1,132 @@
+---
+title: "Classification Prediction Problem"
+subtitle: |
+  | Final Project 
+  | Data Science 3 with R (STAT 301-3)
+author: "Jack White"
+date: today
+
+format:
+  html:
+    toc: true
+    embed-resources: true
+    
+execute:
+  echo: false
+  warning: false
+
+from: markdown+emoji 
+---
+
+<style type="text/css">
+  body{
+  font-family: Georgia;
+  font-size: 12pt;
+}
+</style>
+
+```{r}
+#| label: load-data-packages
+#| echo: false
+
+# load packages
+library(tidyverse)
+library(tidymodels)
+library(here)
+library(naniar)
+library(kableExtra)
+
+# load data
+load(here("data/train_classification.rda"))
+load(here("data/test_classification.rda"))
+```
+
+
+::: {.callout-tip icon="false"}
+## Github Repo Link
+
+<https://github.com/jackwhite2026/classification-prediction-problem.git>
+:::
+
+# Introduction
+
+This prediction problem project asked students to predict whether or not an Airbnb host is a "superhost" or not. The data for this project consists of price and features of Airbnb listings in Chicago as of Dec 2023. In this report, I will provide an overview of the data, along with information on my two top performing models.
+
+# Data Overview & Cleaning
+
+There are training and testing datasets, named `train_classification` and `test_classification`, respectively. Each contained 4977 rows, each representing an Airbnb listing. The training data has 52 variables, while the testing data has 51 variables (target variable (`host_is_superhost`) removed in test set). The variables include various information regarding the airbnb location, features, and information about the host. Many of the variables were character variables, which I changed to factor variables. Furthermore, I used the parse_number function to make the price, host_response_rate, and host_acceptance_rate numeric since they originally included dollar/percent signs. 
+
+In terms of missingness, multiple variables had missingness, including 10 variables with slightly more than 20% missingness. Below shows a table details the missingness of the training dataset.
+
+```{r echo=FALSE}
+missingness <- train_classification |> 
+  miss_var_summary() 
+
+missingness_filtered <- missingness |> 
+  filter(n_miss > 0) 
+
+kable(missingness_filtered, "html") |> 
+  kable_styling(position = "center") |> 
+  kable_classic(html_font = "Georgia") |> 
+  scroll_box(width = "100%", height = "400px")
+```
+
+
+# Target Variable
+
+The target variable for this project `host_is_superhost, which represents whether a airbnb host is a host or superhost. Below, you will see a graph of airbnb superhosts vs normal hosts. There are slightly more normal hosts vs superhosts with 2184 superhosts & 2793 normal hosts. In order to account for this difference, I stratified the folds/resamples by the host_is_superhost variable.
+
+```{r echo=FALSE}
+ 
+train_classification |> 
+  ggplot(aes(x = host_is_superhost)) +
+  geom_bar() +
+  theme_bw() +
+  labs(x = "Host is Superhost", y = "Count", title = "Comparison of Normal Hosts vs Superhosts") +
+  theme(text=element_text(size=10,  family="Georgia"))
+```
+
+
+# Top Performing Model #1: 
+
+My top performing model is a boosted tree model. For reference, this was attempt 4 and can be found under the attempt 4 folder in my github repository. I had tried a boosted tree model earlier, in attempt 2. However, I believe this one had a better outcome for two reasons. First, in my original models, I had used step_rm() to remove the 10 variables with ~20% missingness. However, after talking with other students in the class and one of the TA's I decided to remove them from the step_rm() function, and instead impute them since they were right at the general 20% rule for imputation and I beleived it would help me build a more accurate model. Furthermore, I used step_dummy() & step_novel() on all nominal predictors. Next, I believe the updated tuning parameters helped improve the performance of my 2nd boosted tree vs my first boosted tree model. In my first model, I set a mtry value of 1,5. In the seconde model, I increased the range to 1,20. This parameter controls the number of variables randomly sampled as candidates at each split when building each tree in the ensemble. Furthermore, I increased the trees range from the default 50,500 to 1000,2000. Increasing the number of trees typically increases the model's complexity and capacity to capture complex patterns in the data. However, I did not want to increase the number of trees anymore because this can make the model take more time and can lead to overfitting. Below, you can see the model's performance. It had a mean ROC_AUC value of .94, suggesting strong performance at accurately predicting whether a host is a superhost or not & has a very small standard error of 0.0016. In the kaggle submission, my submission had a public score of .941.
+
+```{r echo=FALSE}
+load(here("attempt_4/results/btree_tuned_2.rda"))
+
+# creating individual tables 
+
+tbl_bt_2 <- show_best(btree_tuned_2, metric = "roc_auc") |> 
+  slice_min(mean) |> 
+  select(mean, n, std_err) |> 
+  mutate(model = "Boosted Tree 2")
+
+kable(tbl_bt_2, "html") |> 
+  kable_styling(position = "center") |> 
+  kable_classic(html_font = "Georgia")
+```
+
+
+# Top Performing Model #2: 
+
+My 2nd best performing model was from attempt #2 and was also a boosted tree model. As discussed in the section above, in this recipe, I used the step_rm() function for all variables with over 10% missingness. Furthermore, I used the default tuning parameters which is why this boosted tree model did not perform as well as the boosted tree model in attempt 4. Below is a table of this model's performance. As you can see, the mean roc_auc is .9 and the standard error is .002, suggesting it is while the standard error is still small, the accuracy of its predictions is smaller than the boosted tree model discussed above. 
+
+```{r echo=FALSE}
+
+load(here("attempt_2/results/btree_tuned_1.rda"))
+
+tbl_bt_1 <- show_best(btree_tuned_1, metric = "roc_auc") |> 
+  slice_min(mean) |> 
+  select(mean, n, std_err) |> 
+  mutate(model = "Boosted Tree 1")
+
+
+kable(tbl_bt_1, "html") |> 
+  kable_styling(position = "center") |> 
+  kable_classic(html_font = "Georgia")
+```
+
+
+# Conclusion
+
+All in all, I think my boosted tree model performs strongly in terms of both roc_auc and standard error. In talking with other students in the class, it also seems they had success in boosted tree models. However, some also mentioned ensemble models performed even better. However, my random forest and nearest neighbor models performed significantly worse than my boosted tree model so it seemed that the ensemble model would not perform very well. In my regression problem, I later changed my data cleaning to make number of bathrooms numeric by using a string to convert half baths to .5 (thanks professor kuyper!). If I had more time to keep playing with this model, I would've liked to do the same and think about using step_unknown() some of the variables in my recipe. 
